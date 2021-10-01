@@ -5,7 +5,9 @@
         "packages/*"
     ],
     "scripts": {
-        "precommit:client": "yarn workspace client precommit",
+        "client": "yarn workspace client",
+        "contracts": "yarn workspace contracts",
+        "precommit:client": "yarn client precommit",
         "precommit:all": "yarn run precommit:client",
         "prepare": "husky install"
     },

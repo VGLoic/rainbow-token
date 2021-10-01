@@ -1,0 +1,24 @@
+{
+    "name": "contracts",
+    "version": "0.1.0",
+    "private": true,
+    "directories": {},
+    "scripts": {
+      "ganache": "ganache-cli -p 7545",
+      "compile": "truffle compile",
+      "test": "truffle test",
+      "deploy:dev": "truffle deploy --reset"
+    },
+    "repository": {},
+    "keywords": [],
+    "license": "MIT",
+    "bugs": {},
+    "dependencies": {},
+    "devDependencies": {
+      "@truffle/hdwallet-provider": "^1.4.1",
+      "dotenv": "^10.0.0",
+      "ganache-cli": "^6.12.2",
+      "truffle": "^5.4.12"
+    }
+  }
+  

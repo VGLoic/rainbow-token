@@ -9,7 +9,7 @@ node_modules
 coverage
 
 # env file
-.env
+.env*
 
 # docker
 .dockerignore
