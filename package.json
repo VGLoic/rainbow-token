@@ -8,7 +8,8 @@
         "client": "yarn workspace client",
         "contracts": "yarn workspace contracts",
         "precommit:client": "yarn client precommit",
-        "precommit:all": "yarn run precommit:client",
+        "precommit:contracts": "yarn contracts precommit",
+        "precommit:all": "yarn run precommit:client && yarn run precommit:contracts",
         "prepare": "husky install"
     },
     "devDependencies": {
