@@ -7,6 +7,7 @@
     "ganache": "ganache-cli -p 7545",
     "compile": "truffle compile",
     "test": "truffle test",
+    "test:cover": "truffle run coverage",
     "deploy:dev": "truffle deploy --reset",
     "format": "prettier --write 'test/**/*.js' 'contracts/**/*.sol'"
   },
@@ -21,6 +22,7 @@
     "ganache-cli": "^6.12.2",
     "prettier": "^2.4.1",
     "prettier-plugin-solidity": "^1.0.0-beta.18",
+    "solidity-coverage": "^0.7.17",
     "truffle": "^5.4.12"
   }
 }
