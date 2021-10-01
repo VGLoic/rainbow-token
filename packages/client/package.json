@@ -36,10 +36,6 @@
   "lint-staged": {
     "*.{ts,tsx,js,css,md}": "prettier --write"
   },
-  "prettier": {
-    "useTabs": false,
-    "tabWidth": 2
-  },
   "browserslist": {
     "production": [
       ">0.2%",
