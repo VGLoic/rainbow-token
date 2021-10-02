@@ -38,7 +38,10 @@ contract RainbowToken {
     uint8 g,
     uint8 b
   ) {
-    require(r < 256 && g < 256 && b < 256, "Invalid color arguments");
+    require(
+      r > 5 && r < 250 && g > 5 && g < 250 && b > 5 && b < 250,
+      "Target color is too close to a base color"
+    );
     require(_manager != address(0), "Invalid zero address for manager");
     Color memory targetColor = Color(r, g, b);
     target = targetColor;
