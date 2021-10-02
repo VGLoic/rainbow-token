@@ -3,21 +3,54 @@ const {
   expectDecrease,
   expectIncrease,
   expectRevert,
-  setup,
+  testSetup,
+  findWinnerPair,
+  findRandomPlayer,
+  findAnotherColorPlayer,
+  addPlayersToGame,
 } = require("./utils");
 
 contract("RainbowToken", (accounts) => {
   it("should allow various addresses to join the game and blend together", async () => {
     const [deployer, ...playerAddresses] = accounts;
 
+    async function customSetup({ instance }) {
+      const originalBalances = await getBalances(playerAddresses);
+
+      const players = await addPlayersToGame({ instance, playerAddresses });
+
+      const winnerPair = findWinnerPair({
+        players,
+        targetColor: { r: 127, g: 127, b: 127 },
+      });
+
+      const firstPlayer = findRandomPlayer({
+        players,
+        excludedPlayers: winnerPair,
+      });
+
+      const secondPlayer = findAnotherColorPlayer({
+        players,
+        color: firstPlayer.color,
+        excludedPlayers: [...winnerPair, firstPlayer],
+      });
+
+      return {
+        originalBalances,
+        winnerPair,
+        firstPlayer,
+        secondPlayer,
+      };
+    }
+
     const {
       managerInstance,
       instance,
-      originalBalances,
-      winner,
-      firstPlayer,
-      otherPlayer,
-    } = await setup(deployer, playerAddresses);
+      custom: { originalBalances, winnerPair, firstPlayer, secondPlayer },
+    } = await testSetup({
+      deployer,
+      customSetup,
+    });
 
     // Balances should have decreased by 0.1 ether for each of the player
 
@@ -50,61 +83,60 @@ contract("RainbowToken", (accounts) => {
 
     // Other player increases its blending price
     await instance.setBlendingPrice(web3.utils.toWei("1"), {
-      from: otherPlayer.address,
+      from: secondPlayer.address,
       gasPrice: 0,
     });
 
     // First player blends with another player
 
     await instance.blend(
-      otherPlayer.address,
-      otherPlayer.color.r,
-      otherPlayer.color.g,
-      otherPlayer.color.b,
+      secondPlayer.address,
+      secondPlayer.color.r,
+      secondPlayer.color.g,
+      secondPlayer.color.b,
       { from: firstPlayer.address, gasPrice: 0, value: web3.utils.toWei("1") }
     );
 
     // Color should be updated for the first player only
 
-    const [updatedFirstPlayer, updatedOtherPlayer] = await instance.getPlayers([
-      firstPlayer.address,
-      otherPlayer.address,
-    ]);
+    const [updatedFirstPlayer, updatedSecondPlayer] = await instance.getPlayers(
+      [firstPlayer.address, secondPlayer.address]
+    );
     expect(Number(updatedFirstPlayer.color.r)).to.equal(
       Math.floor(
-        (Number(firstPlayer.color.r) + Number(otherPlayer.color.r)) / 2
+        (Number(firstPlayer.color.r) + Number(secondPlayer.color.r)) / 2
       ),
       "Player R component has been wrongly updated after blend with other player"
     );
     expect(Number(updatedFirstPlayer.color.g)).to.equal(
       Math.floor(
-        (Number(firstPlayer.color.g) + Number(otherPlayer.color.g)) / 2
+        (Number(firstPlayer.color.g) + Number(secondPlayer.color.g)) / 2
       ),
       "Player G component has been wrongly updated after blend with other player"
     );
     expect(Number(updatedFirstPlayer.color.b)).to.equal(
       Math.floor(
-        (Number(firstPlayer.color.b) + Number(otherPlayer.color.b)) / 2
+        (Number(firstPlayer.color.b) + Number(secondPlayer.color.b)) / 2
       ),
       "Player B component has been wrongly updated after blend with other player"
     );
-    expect(updatedOtherPlayer.color.r).to.equal(
-      otherPlayer.color.r,
+    expect(updatedSecondPlayer.color.r).to.equal(
+      secondPlayer.color.r,
       "Other player R component has been updated after blend with first player"
     );
-    expect(updatedOtherPlayer.color.g).to.equal(
-      otherPlayer.color.g,
+    expect(updatedSecondPlayer.color.g).to.equal(
+      secondPlayer.color.g,
       "Other player G component has been updated after blend with first player"
     );
-    expect(updatedOtherPlayer.color.b).to.equal(
-      otherPlayer.color.b,
+    expect(updatedSecondPlayer.color.b).to.equal(
+      secondPlayer.color.b,
       "Other player B component has been updated after blend with first player"
     );
 
     // Balances should be updated
 
-    const [updatedFirstPlayerBalance, updatedOtherPlayerBalance] =
-      await getBalances([firstPlayer.address, otherPlayer.address]);
+    const [updatedFirstPlayerBalance, updatedSecondPlayerBalance] =
+      await getBalances([firstPlayer.address, secondPlayer.address]);
     expectDecrease(
       updatedPlayerBalances[firstPlayer.index],
       1,
@@ -112,9 +144,9 @@ contract("RainbowToken", (accounts) => {
       "Balance of the first player is not correct after blend with other player"
     );
     expectIncrease(
-      updatedPlayerBalances[otherPlayer.index],
+      updatedPlayerBalances[secondPlayer.index],
       0.5,
-      updatedOtherPlayerBalance,
+      updatedSecondPlayerBalance,
       "Balance of the other player is not correct after blend with first player"
     );
 
@@ -184,6 +216,22 @@ contract("RainbowToken", (accounts) => {
 
     // Winner claims victory
 
+    const [winner, matchingPlayer] = winnerPair;
+    await instance.blend(
+      matchingPlayer.address,
+      matchingPlayer.color.r,
+      matchingPlayer.color.g,
+      matchingPlayer.color.b,
+      {
+        from: winner.address,
+        value: web3.utils.toWei("0.1"),
+        gasPrice: 0,
+      }
+    );
+    previousContractBalance = contractBalance;
+    [contractBalance] = await getBalances([instance.address]);
+
+    const [beforeWinWinnerBalance] = await getBalances([winner.address]);
     await managerInstance.claimVictory(0, 0, 0, {
       from: winner.address,
       gasPrice: 0,
@@ -195,7 +243,7 @@ contract("RainbowToken", (accounts) => {
 
     const [winnerBalance] = await getBalances([winner.address]);
     expectIncrease(
-      updatedPlayerBalances[winner.index],
+      beforeWinWinnerBalance,
       previousContractBalance,
       winnerBalance,
       "Balance of the winner is not correct after claiming victory."
@@ -207,11 +255,40 @@ contract("RainbowToken", (accounts) => {
   });
 
   describe("Exceptions", () => {
+    const gameOverSetup =
+      (playerAddresses) =>
+      async ({ instance, managerInstance }) => {
+        const players = await addPlayersToGame({ instance, playerAddresses });
+        const winnerPair = findWinnerPair({
+          players,
+          targetColor: { r: 127, g: 127, b: 127 },
+        });
+
+        const [winner, matchingPlayer] = winnerPair;
+        await instance.blend(
+          matchingPlayer.address,
+          matchingPlayer.color.r,
+          matchingPlayer.color.g,
+          matchingPlayer.color.b,
+          {
+            from: winner.address,
+            value: web3.utils.toWei("0.1"),
+            gasPrice: 0,
+          }
+        );
+
+        await managerInstance.claimVictory(127, 127, 127, {
+          from: winner.address,
+          gasPrice: 0,
+        });
+
+        return winnerPair;
+      };
     describe("joining the game", () => {
       it("should revert if not enough value is sent to join the game", async () => {
         const [deployer, player] = accounts;
 
-        const { instance } = await setup(deployer);
+        const { instance } = await testSetup({ deployer });
 
         await expectRevert(
           instance.joinGame({
@@ -226,7 +303,7 @@ contract("RainbowToken", (accounts) => {
       it("should revert if sender is already a player", async () => {
         const [deployer, account] = accounts;
 
-        const { instance } = await setup(deployer);
+        const { instance } = await testSetup({ deployer });
 
         await instance.joinGame({
           from: account,
@@ -247,14 +324,9 @@ contract("RainbowToken", (accounts) => {
       it("should revert if game is over", async () => {
         const [deployer, ...playerAddresses] = accounts;
 
-        const { managerInstance, instance, winner } = await setup(
+        const { instance } = await testSetup({
           deployer,
-          playerAddresses
-        );
-
-        await managerInstance.claimVictory(0, 0, 0, {
-          from: winner.address,
-          gasPrice: 0,
+          customSetup: gameOverSetup(playerAddresses),
         });
 
         await expectRevert(
@@ -272,10 +344,20 @@ contract("RainbowToken", (accounts) => {
       it("should revert if not enough value is sent", async () => {
         const [deployer, ...playerAddresses] = accounts;
 
-        const { instance, firstPlayer } = await setup(
+        const {
+          instance,
+          custom: { firstPlayer },
+        } = await testSetup({
           deployer,
-          playerAddresses
-        );
+          customSetup: async ({ instance }) => {
+            const players = await addPlayersToGame({
+              instance,
+              playerAddresses,
+            });
+            const firstPlayer = findRandomPlayer({ players });
+            return { firstPlayer };
+          },
+        });
 
         await expectRevert(
           instance.selfBlend({
@@ -290,7 +372,7 @@ contract("RainbowToken", (accounts) => {
       it("should revert if sender is not a player", async () => {
         const [deployer, account] = accounts;
 
-        const { instance } = await setup(deployer);
+        const { instance } = await testSetup({ deployer });
 
         await expectRevert(
           instance.selfBlend({
@@ -305,14 +387,12 @@ contract("RainbowToken", (accounts) => {
       it("should revert if game is over", async () => {
         const [deployer, ...playerAddresses] = accounts;
 
-        const { managerInstance, instance, winner, firstPlayer } = await setup(
+        const {
+          instance,
+          custom: [, firstPlayer],
+        } = await testSetup({
           deployer,
-          playerAddresses
-        );
-
-        await managerInstance.claimVictory(0, 0, 0, {
-          from: winner.address,
-          gasPrice: 0,
+          customSetup: gameOverSetup(playerAddresses),
         });
 
         await expectRevert(
@@ -330,17 +410,34 @@ contract("RainbowToken", (accounts) => {
       it("should revert if not enough value is sent", async () => {
         const [deployer, ...playerAddresses] = accounts;
 
-        const { instance, firstPlayer, otherPlayer } = await setup(
+        const {
+          instance,
+          custom: { firstPlayer, secondPlayer },
+        } = await testSetup({
           deployer,
-          playerAddresses
-        );
+          customSetup: async ({ instance }) => {
+            const players = await addPlayersToGame({
+              instance,
+              playerAddresses,
+            });
+            const firstPlayer = findRandomPlayer({ players });
+            const secondPlayer = findRandomPlayer({
+              players,
+              excludedPlayers: [firstPlayer],
+            });
+            return {
+              firstPlayer,
+              secondPlayer,
+            };
+          },
+        });
 
         await expectRevert(
           instance.blend(
-            otherPlayer.address,
-            otherPlayer.color.r,
-            otherPlayer.color.g,
-            otherPlayer.color.b,
+            secondPlayer.address,
+            secondPlayer.color.r,
+            secondPlayer.color.g,
+            secondPlayer.color.b,
             {
               from: firstPlayer.address,
               value: web3.utils.toWei("0.09"),
@@ -352,19 +449,31 @@ contract("RainbowToken", (accounts) => {
       });
 
       it("should revert if sender is not a player", async () => {
-        const [deployer, ...playerAddresses] = accounts;
+        const [deployer, account] = accounts;
 
-        const { instance, otherPlayer } = await setup(
+        const {
+          instance,
+          custom: { firstPlayer },
+        } = await testSetup({
           deployer,
-          playerAddresses
-        );
+          customSetup: async ({ instance }) => {
+            const players = await addPlayersToGame({
+              instance,
+              playerAddresses: [account],
+            });
+            const firstPlayer = findRandomPlayer({ players });
+            return {
+              firstPlayer,
+            };
+          },
+        });
 
         await expectRevert(
           instance.blend(
-            otherPlayer.address,
-            otherPlayer.color.r,
-            otherPlayer.color.g,
-            otherPlayer.color.b,
+            firstPlayer.address,
+            firstPlayer.color.r,
+            firstPlayer.color.g,
+            firstPlayer.color.b,
             { from: deployer, value: web3.utils.toWei("0.1"), gasPrice: 0 }
           ),
           "Sender is not a player"
@@ -372,12 +481,22 @@ contract("RainbowToken", (accounts) => {
       });
 
       it("should revert if target is not a player", async () => {
-        const [deployer, ...playerAddresses] = accounts;
+        const [deployer, account] = accounts;
 
-        const { instance, firstPlayer } = await setup(
+        const {
+          instance,
+          custom: { firstPlayer },
+        } = await testSetup({
           deployer,
-          playerAddresses
-        );
+          customSetup: async ({ instance }) => {
+            const players = await addPlayersToGame({
+              instance,
+              playerAddresses: [account],
+            });
+            const firstPlayer = findRandomPlayer({ players });
+            return { firstPlayer };
+          },
+        });
 
         await expectRevert(
           instance.blend(deployer, 0, 0, 0, {
@@ -392,14 +511,29 @@ contract("RainbowToken", (accounts) => {
       it("should revert if input color is not the one of the player", async () => {
         const [deployer, ...playerAddresses] = accounts;
 
-        const { instance, firstPlayer, otherPlayer } = await setup(
+        const {
+          instance,
+          custom: { firstPlayer, secondPlayer },
+        } = await testSetup({
           deployer,
-          playerAddresses
-        );
+          customSetup: async ({ instance }) => {
+            const players = await addPlayersToGame({
+              instance,
+              playerAddresses,
+            });
+            const firstPlayer = findRandomPlayer({ players });
+            const secondPlayer = findAnotherColorPlayer({
+              players,
+              color: firstPlayer.color,
+              excludedPlayers: [firstPlayer],
+            });
+            return { firstPlayer, secondPlayer };
+          },
+        });
 
         await expectRevert(
           instance.blend(
-            otherPlayer.address,
+            secondPlayer.address,
             firstPlayer.color.r,
             firstPlayer.color.g,
             firstPlayer.color.b,
@@ -416,14 +550,12 @@ contract("RainbowToken", (accounts) => {
       it("should revert if game is over", async () => {
         const [deployer, ...playerAddresses] = accounts;
 
-        const { managerInstance, instance, winner, otherPlayer } = await setup(
+        const {
+          instance,
+          custom: [, otherPlayer],
+        } = await testSetup({
           deployer,
-          playerAddresses
-        );
-
-        await managerInstance.claimVictory(0, 0, 0, {
-          from: winner.address,
-          gasPrice: 0,
+          customSetup: gameOverSetup(playerAddresses),
         });
 
         await expectRevert(
@@ -443,7 +575,7 @@ contract("RainbowToken", (accounts) => {
       it("should revert if sender is not a player", async () => {
         const [deployer, account] = accounts;
 
-        const { instance } = await setup(deployer);
+        const { instance } = await testSetup({ deployer });
 
         await expectRevert(
           instance.setBlendingPrice(web3.utils.toWei("0.5"), {
@@ -455,12 +587,22 @@ contract("RainbowToken", (accounts) => {
       });
 
       it("should revert if new blending price is 0", async () => {
-        const [deployer, ...playerAddresses] = accounts;
+        const [deployer, account] = accounts;
 
-        const { instance, firstPlayer } = await setup(
+        const {
+          instance,
+          custom: { firstPlayer },
+        } = await testSetup({
           deployer,
-          playerAddresses
-        );
+          customSetup: async ({ instance }) => {
+            const players = await addPlayersToGame({
+              instance,
+              playerAddresses: [account],
+            });
+            const firstPlayer = findRandomPlayer({ players });
+            return { firstPlayer };
+          },
+        });
 
         await expectRevert(
           instance.setBlendingPrice(web3.utils.toWei("0"), {
@@ -474,19 +616,17 @@ contract("RainbowToken", (accounts) => {
       it("should revert if game is over", async () => {
         const [deployer, ...playerAddresses] = accounts;
 
-        const { managerInstance, instance, winner, firstPlayer } = await setup(
+        const {
+          instance,
+          custom: [, otherPlayer],
+        } = await testSetup({
           deployer,
-          playerAddresses
-        );
-
-        await managerInstance.claimVictory(0, 0, 0, {
-          from: winner.address,
-          gasPrice: 0,
+          customSetup: gameOverSetup(playerAddresses),
         });
 
         await expectRevert(
           instance.setBlendingPrice(web3.utils.toWei("0.5"), {
-            from: firstPlayer.address,
+            from: otherPlayer.address,
             gasPrice: 0,
           }),
           "The game is over"
@@ -495,12 +635,12 @@ contract("RainbowToken", (accounts) => {
     });
 
     describe("claimVictory", () => {
-      it("should revert if the argument address is not a player", async () => {
-        const [deployer, ...playerAddresses] = accounts;
-        const { managerInstance } = await setup(deployer, playerAddresses);
+      it("should revert if the sender is not a player", async () => {
+        const [deployer] = accounts;
+        const { managerInstance } = await testSetup({ deployer });
 
         await expectRevert(
-          managerInstance.claimVictory(0, 0, 0, {
+          managerInstance.claimVictory(127, 127, 127, {
             from: deployer,
             gasPrice: 0,
           }),
@@ -508,17 +648,75 @@ contract("RainbowToken", (accounts) => {
         );
       });
 
-      // it("should revert if the game is over", async () => {
-      //   const [deployer, ...playerAddresses] = accounts;
-      //   const { managerInstance, winner } = await setup(deployer, playerAddresses);
+      it("should revert if the game is over", async () => {
+        const [deployer, ...playerAddresses] = accounts;
+        const {
+          managerInstance,
+          custom: { firstWinner, secondWinner },
+        } = await testSetup({
+          deployer,
+          customSetup: async ({ instance }) => {
+            const players = await addPlayersToGame({
+              instance,
+              playerAddresses,
+            });
 
-      //   await managerInstance.claimVictory(0, 0, 0, { from: winner.address, gasPrice:0 }),
+            const firstWinnerPair = findWinnerPair({
+              players,
+              targetColor: { r: 127, g: 127, b: 127 },
+            });
 
-      //   await expectRevert(
-      //     managerInstance.claimVictory(0, 0, 0, { from: winner.address, gasPrice:0 }),
-      //     "The game is over"
-      //   );
-      // });
+            const secondWinnerPair = findWinnerPair({
+              players,
+              targetColor: { r: 127, g: 127, b: 127 },
+              excludedPlayers: [firstWinnerPair[0]],
+            });
+
+            const [firstWinner, firstMatchingPlayer] = firstWinnerPair;
+            await instance.blend(
+              firstMatchingPlayer.address,
+              firstMatchingPlayer.color.r,
+              firstMatchingPlayer.color.g,
+              firstMatchingPlayer.color.b,
+              {
+                from: firstWinner.address,
+                value: web3.utils.toWei("0.1"),
+                gasPrice: 0,
+              }
+            );
+
+            const [secondWinner, secondMatchingPlayer] = secondWinnerPair;
+            await instance.blend(
+              secondMatchingPlayer.address,
+              secondMatchingPlayer.color.r,
+              secondMatchingPlayer.color.g,
+              secondMatchingPlayer.color.b,
+              {
+                from: secondWinner.address,
+                value: web3.utils.toWei("0.1"),
+                gasPrice: 0,
+              }
+            );
+
+            return {
+              firstWinner,
+              secondWinner,
+            };
+          },
+        });
+
+        await managerInstance.claimVictory(0, 0, 0, {
+          from: firstWinner.address,
+          gasPrice: 0,
+        }),
+          await expectRevert(
+            managerInstance.claimVictory(0, 0, 0, {
+              from: secondWinner.address,
+              gasPrice: 0,
+            }),
+            "Claimed winner address is not a player"
+          );
+      });
     });
   });
 });
