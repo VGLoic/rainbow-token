@@ -401,6 +401,50 @@ contract("RainbowToken Exceptions", (accounts) => {
       );
     });
 
+    it("should revert if the new target color is not acceptable", async () => {
+      const [deployer, ...playerAddresses] = accounts;
+      const {
+        managerInstance,
+        custom: { winner },
+      } = await testSetup({
+        deployer,
+        customSetup: async ({ instance }) => {
+          const players = await addPlayersToGame({
+            instance,
+            playerAddresses,
+          });
+
+          const winnerPair = findWinnerPair({
+            players,
+            targetColor: { r: 127, g: 127, b: 127 },
+          });
+
+          const [winner, matchingPlayer] = winnerPair;
+          await instance.blend(
+            matchingPlayer.address,
+            matchingPlayer.color.r,
+            matchingPlayer.color.g,
+            matchingPlayer.color.b,
+            {
+              from: winner.address,
+              value: web3.utils.toWei("0.1"),
+              gasPrice: 0,
+            }
+          );
+
+          return { winner };
+        },
+      });
+
+      await expectRevert(
+        managerInstance.claimVictory(5, 120, 120, {
+          from: winner.address,
+          gasPrice: 0,
+        }),
+        "Target color is too close to a base color"
+      );
+    });
+
     it("should revert if the game is over", async () => {
       const [deployer, ...playerAddresses] = accounts;
       const {
