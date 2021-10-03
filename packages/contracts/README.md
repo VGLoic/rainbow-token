@@ -14,38 +14,26 @@ Here is an organisation of the various folders:
 
 ## Available scripts
 
-### Launch a development network
+### `yarn ganache`
 
-```
-yarn ganache
-```
+Launch a development network
 
-### Compile the smart contracts
+### `yarn compile`
 
-```
-yarn compile
-```
+Compile the smart contracts
 
-### Launch the tests on the development network
+### `yarn test`
 
-```
-yarn test
-```
+Launch the tests on the development network
 
-### Deploy on the development network
+### `yarn deploy:dev`
 
-```
-yarn deploy:dev
-```
+Deploy on the development network
 
-### Launch the tests with cover
+### `yarn test:cover`
 
-```
-yarn test:cover
-```
+Launch the tests with cover
 
-## Format `.sol` and `.js` files
+### `yarn format`
 
-```
-yarn format
-```
+Format `.sol` and `.js` files
