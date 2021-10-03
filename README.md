@@ -1,15 +1,25 @@
-[![Build Status](https://travis-ci.org/ConsenSys/rainbow-token.svg?branch=master)](https://travis-ci.org/ConsenSys/rainbow-token)
-[![Coverage Status](https://coveralls.io/repos/github/ConsenSys/rainbow-token/badge.svg?branch=master)](https://coveralls.io/github/ConsenSys/rainbow-token?branch=master)
-
 # Rainbow-Token
 
-Colorful World of Rainbow-Token
+The project is organised using a `yarn workspace`.
 
-Start Ganache:
+The various packages are described as follows:
+- `client`: the React application
+- `contracts`: the smart contracts
 
-    cd ganache
-    ACCOUNTS=`cat accounts.txt` docker-compose up
+## Installation
 
-Start dev:
+Install the dependencies in the various packages
+```
+yarn install
+```
 
-    docker-compose up
+## Available Scripts
+
+### `yarn contracts <script>`
+
+Run script in the contracts package
+
+
+### `yarn client <script>`
+
+Run script in the client package
