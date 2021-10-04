@@ -10,7 +10,7 @@ function MetaMaskIcon() {
         component="img"
         sx={{ height: "100%" }}
         src={metamaskSvg}
-        alt="fwuiebf"
+        alt="metamask"
       />
     </Icon>
   );
@@ -34,7 +34,7 @@ function ConnectionPanel() {
       }}
     >
       <Typography variant="overline" fontSize={15}>
-        Connect your favorite wallet
+        Connect with your favorite wallet
       </Typography>
       <Box display="flex">
         <LoadingButton
