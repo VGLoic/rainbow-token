@@ -38,6 +38,7 @@ function ConnectionPanel() {
       </Typography>
       <Box display="flex">
         <LoadingButton
+          disabled={status === "unavailable"}
           variant="outlined"
           onClick={connect}
           startIcon={<MetaMaskIcon />}
