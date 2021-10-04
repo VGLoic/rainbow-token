@@ -1,6 +1,5 @@
 import { CssBaseline } from "@mui/material";
-import { MetaMaskProvider } from "metamask-react";
-import { ThemeProvider } from "providers";
+import AppProviders from "providers";
 import React from "react";
 import ReactDOM from "react-dom";
 import App from "./App";
@@ -10,13 +9,11 @@ import reportWebVitals from "./reportWebVitals";
 ReactDOM.render(
   <React.StrictMode>
     <CssBaseline />
-    <ThemeProvider>
-      <MetaMaskProvider>
-        <Layout>
-          <App />
-        </Layout>
-      </MetaMaskProvider>
-    </ThemeProvider>
+    <AppProviders>
+      <Layout>
+        <App />
+      </Layout>
+    </AppProviders>
   </React.StrictMode>,
   document.getElementById("root")
 );

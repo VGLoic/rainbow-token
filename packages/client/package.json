@@ -22,6 +22,7 @@
     "web-vitals": "^1.0.1"
   },
   "devDependencies": {
+    "eth-testing": "^1.0.2-alpha",
     "lint-staged": "^11.1.2",
     "prettier": "2.4.0"
   },
@@ -41,6 +42,7 @@
   "lint-staged": {
     "*.{ts,tsx,js,css,md}": "prettier --write"
   },
+  "jestConfig": {},
   "browserslist": {
     "production": [
       ">0.2%",
