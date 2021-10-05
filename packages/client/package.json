@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@emotion/react": "^11.4.1",
+    "@emotion/styled": "^11.3.0",
+    "@mui/lab": "^5.0.0-alpha.49",
+    "@mui/material": "^5.0.2",
     "@testing-library/jest-dom": "^5.11.4",
     "@testing-library/react": "^11.1.0",
     "@testing-library/user-event": "^12.1.10",
@@ -10,6 +14,7 @@
     "@types/node": "^12.0.0",
     "@types/react": "^17.0.0",
     "@types/react-dom": "^17.0.0",
+    "metamask-react": "^2.0.2",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-scripts": "4.0.3",
@@ -17,6 +22,7 @@
     "web-vitals": "^1.0.1"
   },
   "devDependencies": {
+    "eth-testing": "^1.0.2-alpha",
     "lint-staged": "^11.1.2",
     "prettier": "2.4.0"
   },
@@ -36,6 +42,7 @@
   "lint-staged": {
     "*.{ts,tsx,js,css,md}": "prettier --write"
   },
+  "jestConfig": {},
   "browserslist": {
     "production": [
       ">0.2%",

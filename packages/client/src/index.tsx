@@ -1,12 +1,19 @@
+import { CssBaseline } from "@mui/material";
+import AppProviders from "providers";
 import React from "react";
 import ReactDOM from "react-dom";
-import "./index.css";
 import App from "./App";
+import Layout from "./layout";
 import reportWebVitals from "./reportWebVitals";
 
 ReactDOM.render(
   <React.StrictMode>
-    <App />
+    <CssBaseline />
+    <AppProviders>
+      <Layout>
+        <App />
+      </Layout>
+    </AppProviders>
   </React.StrictMode>,
   document.getElementById("root")
 );
